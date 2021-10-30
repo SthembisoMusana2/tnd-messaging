@@ -221,6 +221,7 @@ app.post('/send', (req, res)=>{
     let messageRef = JSON.parse(req.body);
     res.setHeader('Access-Control-Allow-Origin', '*');
     // route message from one user to the next
+    console.log(users);
     if(messageRef.recipientType === 'single'){
         let recipient  = messageRef.recipient;
         let user = searchArray(users, recipient, 'email');
@@ -233,13 +234,11 @@ app.post('/send', (req, res)=>{
             user.updateMessageList(messageRef);
             messageRef.status = 'sent'
             res.end(JSON.stringify(messageRef));
-            console.log('sent Message', messageRef)
             return;
         }else{
             console.log(messageRef)
             UserModel.findOne({email:messageRef.recipient})
             .then((dbRes)=>{
-                console.log(dbRes)
                 if(dbRes.length > 0){
                     let tempUser = new User(dbRes.username, dbRes.email, dbRes._id, dbRes.avatar, dbRes.messages, []);
                     tempUser.cachedUsersList.push(dbRes.friends);
