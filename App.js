@@ -221,7 +221,7 @@ app.post('/send', (req, res)=>{
     let messageRef = JSON.parse(req.body);
     res.setHeader('Access-Control-Allow-Origin', '*');
     // route message from one user to the next
-    console.log(users);
+    // console.log(users);
     if(messageRef.recipientType === 'single'){
         let recipient  = messageRef.recipient;
         let user = searchArray(users, recipient, 'email');
@@ -381,7 +381,8 @@ app.post('/login', (req, resp)=>{
         if(res.status == ''){ // the login was successful
             
             resp.write('successful$');
-            let userSearch = searchArray(users, res.username);
+            let userSearch = searchArray(users, res.email, 'email');
+            console.log(userSearch)
             if(userSearch == null){
                 await UserModel.findOne({email:userFormData.email})
                 .then((dbRes)=>{
