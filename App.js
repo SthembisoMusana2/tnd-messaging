@@ -236,6 +236,7 @@ app.post('/send', (req, res)=>{
             console.log('sent Message', messageRef)
             return;
         }else{
+            console.log(messageRef)
             UserModel.findOne({email:messageRef.recipient})
             .then((dbRes)=>{
                 console.log(dbRes)
