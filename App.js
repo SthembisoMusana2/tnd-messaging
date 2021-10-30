@@ -236,8 +236,9 @@ app.post('/send', (req, res)=>{
             console.log('sent Message', messageRef)
             return;
         }else{
-            UserModel.findOne({email:recipient})
+            UserModel.findOne({email:messageRef.recipient})
             .then((dbRes)=>{
+                console.log(dbRes)
                 if(dbRes.length > 0){
                     let tempUser = new User(dbRes.username, dbRes.email, dbRes._id, dbRes.avatar, dbRes.messages, []);
                     tempUser.cachedUsersList.push(dbRes.friends);
