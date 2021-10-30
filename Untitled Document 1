@@ -1,0 +1,10 @@
+function toRegExp(str=''){
+    let re = str.toLowerCase() + str.toUpperCase();
+    let newBuf = [];
+    let k = re.length/2;
+    for(let j=0; j<k; j++){
+        newBuf.push('['+re.charAt(j)+re.charAt(j+k)+']');
+    }
+    let regExp = newBuf.join('');
+    return(new RegExp(regExp));
+}
