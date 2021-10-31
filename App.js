@@ -256,8 +256,7 @@ app.post('/send', (req, res)=>{
             res.end(JSON.stringify(messageRef));
 
         }else{
-            
-            UserModel.findOne({email:messageRef.recipient})
+            UserModel.findOne({email:recipient})
             .then((dbRes)=>{
                 console.log('Database Reponse',dbRes);
                 if(dbRes != null){
