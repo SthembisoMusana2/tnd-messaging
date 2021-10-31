@@ -29,7 +29,7 @@ class User{
         }
     }
     updateMessageList(message){
-        this.recentMessages.push(message);
+        if(message.sEmail != this.email)this.recentMessages.push(message);
         this.historyList.push(message); // doesnt matter who the message is coming from just add it.
         for (let friend of this.friendsList){
             if(message.recipient === friend.email || message.sEmail === friend.email){
@@ -37,7 +37,6 @@ class User{
                 break;
             }
         }
-
     }
     clearRecentList(){
         this.recentMessages.splice(0, this.recentMessages.length);
@@ -235,10 +234,10 @@ app.post('/send', (req, res)=>{
         let user = searchArray(users, recipient, 'email');
         if( user != null){
             let sender = searchArray(user.friendsList, messageRef.sEmail, 'email');
-            if(sender == null){
-                let senderO = searchArray(users, messageRef.sEmail, 'email');
-                user.appendFriendList(senderO);
-                senderO.updateMessageList(messageRef);
+            if(sender == null){ // we are not friends with the person we are contacting
+                let sender = searchArray(users, messageRef.sEmail, 'email');
+                user.appendFriendList(sender); // make us friends
+                sender.updateMessageList(messageRef); // update the senders message list for backup
             }
             else{
                 sender.updateMessageList(messageRef);
@@ -246,7 +245,7 @@ app.post('/send', (req, res)=>{
             user.updateMessageList(messageRef);
             
             UserModel.findOneAndReplace(user.id, user.toJSON()) // update the User in the DB
-            .then(res=>{console.log(res)})
+            .then(res=>{console.log('Backup Response: ',res)})
             .catch(err=>{console.log(err);});
 
             UserModel.findOneAndReplace(sender.id, sender.toJSON())
@@ -260,7 +259,7 @@ app.post('/send', (req, res)=>{
             
             UserModel.findOne({email:messageRef.recipient})
             .then((dbRes)=>{
-                console.log(dbRes);
+                console.log('Database Reponse',dbRes);
                 if(dbRes != null){
                     let id = dbRes._id.toString();
                     let tempUser = new User(dbRes.username, dbRes.email, id, dbRes.avatar, dbRes.messages, []);
@@ -278,7 +277,7 @@ app.post('/send', (req, res)=>{
                     }
 
                     UserModel.findOneAndReplace(tempUser.id, tempUser.toJSON()) // update the User in the DB
-                    .then(res=>{console.log(res)})
+                    .then(res=>{console.log('Backup Response: ',res)})
                     .catch(err=>{console.log(err);});
 
                     UserModel.findOneAndReplace(sender.id, sender.toJSON())
@@ -419,10 +418,8 @@ app.post('/login', (req, resp)=>{
     .then(async res=>{
         resp.setHeader('Access-Control-Allow-Origin', '*');
         if(res.status == ''){ // the login was successful
-            
             resp.write('successful$');
             let userSearch = searchArray(users, res.email, 'email');
-            console.log(userSearch)
             if(userSearch == null){
                 await UserModel.findOne({email:userFormData.email})
                 .then((dbRes)=>{
