@@ -246,7 +246,7 @@ app.post('/send', (req, res)=>{
             user.updateMessageList(messageRef);
             
             UserModel.findOneAndReplace(user.id, user.toJSON()) // update the User in the DB
-            .then(res=>{})
+            .then(res=>{console.log(res)})
             .catch(err=>{console.log(err);});
 
             UserModel.findOneAndReplace(sender.id, sender.toJSON())
@@ -278,7 +278,7 @@ app.post('/send', (req, res)=>{
                     }
 
                     UserModel.findOneAndReplace(tempUser.id, tempUser.toJSON()) // update the User in the DB
-                    .then(res=>{})
+                    .then(res=>{console.log(res)})
                     .catch(err=>{console.log(err);});
 
                     UserModel.findOneAndReplace(sender.id, sender.toJSON())
