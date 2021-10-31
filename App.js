@@ -228,7 +228,7 @@ app.post('/send', (req, res)=>{
     let messageRef = JSON.parse(req.body);
     res.setHeader('Access-Control-Allow-Origin', '*');
     // route message from one user to the next
-    // console.log(users);
+    console.log(messageRef);
     if(messageRef.recipientType === 'single'){
         let recipient  = messageRef.recipient;
         let user = searchArray(users, recipient, 'email');
