@@ -245,9 +245,6 @@ app.post('/send', (req, res)=>{
             }
             user.updateMessageList(messageRef);
             
-            messageRef.status = 'sent'
-            res.end(JSON.stringify(messageRef));
-
             UserModel.findOneAndReplace(user.id, user.toJSON()) // update the User in the DB
             .then(res=>{})
             .catch(err=>{console.log(err);});
@@ -256,6 +253,9 @@ app.post('/send', (req, res)=>{
             .then(res=>{})
             .catch(err=>{console.log(err);});
             // return;
+            messageRef.status = 'sent'
+            res.end(JSON.stringify(messageRef));
+
         }else{
             
             UserModel.findOne({email:messageRef.recipient})
@@ -277,10 +277,6 @@ app.post('/send', (req, res)=>{
                         sender.updateMessageList(messageRef);
                     }
 
-                    messageRef.status = 'sent'
-                    res.end(JSON.stringify(messageRef));
-
-
                     UserModel.findOneAndReplace(tempUser.id, tempUser.toJSON()) // update the User in the DB
                     .then(res=>{})
                     .catch(err=>{console.log(err);});
@@ -289,7 +285,8 @@ app.post('/send', (req, res)=>{
                     .then(res=>{})
                     .catch(err=>{console.log(err);});
 
-
+                    messageRef.status = 'sent'
+                    res.end(JSON.stringify(messageRef));
                 } 
             })
             .catch(err=>{console.log(err)})
