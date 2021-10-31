@@ -31,6 +31,13 @@ class User{
     updateMessageList(message){
         this.recentMessages.push(message);
         this.historyList.push(message); // doesnt matter who the message is coming from just add it.
+        for (let friend of this.friendsList){
+            if(message.recipient === friend.email || message.sEmail === friend.email){
+                friend.historyList.push(message);
+                break;
+            }
+        }
+
     }
     clearRecentList(){
         this.recentMessages.splice(0, this.recentMessages.length);
@@ -93,7 +100,8 @@ class User{
             email:this.email,
             id:this.id,
             avatar:this.imgUrl,
-            userId:this.id
+            userId:this.id,
+            messages:this.historyList
         });
     }
 }
@@ -230,27 +238,62 @@ app.post('/send', (req, res)=>{
             if(sender == null){
                 let senderO = searchArray(users, messageRef.sEmail, 'email');
                 user.appendFriendList(senderO);
+                senderO.updateMessageList(messageRef);
+            }
+            else{
+                sender.updateMessageList(messageRef);
             }
             user.updateMessageList(messageRef);
+            
             messageRef.status = 'sent'
             res.end(JSON.stringify(messageRef));
-            return;
+
+            UserModel.findOneAndReplace(user.id, user.toJSON()) // update the User in the DB
+            .then(res=>{})
+            .catch(err=>{console.log(err);});
+
+            UserModel.findOneAndReplace(sender.id, sender.toJSON())
+            .then(res=>{})
+            .catch(err=>{console.log(err);});
+            // return;
         }else{
-            console.log(messageRef)
+            
             UserModel.findOne({email:messageRef.recipient})
             .then((dbRes)=>{
-                if(dbRes.length > 0){
-                    let tempUser = new User(dbRes.username, dbRes.email, dbRes._id, dbRes.avatar, dbRes.messages, []);
+                console.log(dbRes);
+                if(dbRes != null){
+                    let id = dbRes._id.toString();
+                    let tempUser = new User(dbRes.username, dbRes.email, id, dbRes.avatar, dbRes.messages, []);
                     tempUser.cachedUsersList.push(dbRes.friends);
                     users.push(tempUser);
                     tempUser.updateMessageList(messageRef);
+                    let sender = searchArray(tempUser.friendsList, messageRef.sEmail, 'email');
+                    if(sender == null){
+                        sender = searchArray(users, messageRef.sEmail, 'email');
+                        tempUser.appendFriendList(sender);
+                        sender.updateMessageList(messageRef);
+                    }
+                    else{
+                        sender.updateMessageList(messageRef);
+                    }
+
                     messageRef.status = 'sent'
                     res.end(JSON.stringify(messageRef));
+
+
+                    UserModel.findOneAndReplace(tempUser.id, tempUser.toJSON()) // update the User in the DB
+                    .then(res=>{})
+                    .catch(err=>{console.log(err);});
+
+                    UserModel.findOneAndReplace(sender.id, sender.toJSON())
+                    .then(res=>{})
+                    .catch(err=>{console.log(err);});
+
+
                 } 
             })
             .catch(err=>{console.log(err)})
-        }
-        
+        }        
     }
     else if(messageRef.recipientType === 'group'){
         let groupName = messageRef.group.name;
@@ -259,8 +302,8 @@ app.post('/send', (req, res)=>{
         group.updateMessageList(messageRef);
         messageRef.status = 'sent';
         res.end(JSON.stringify(messageRef));
-        return;
-    }
+        // return;
+    }    
 });
 
 app.post('/poll', (req, res)=>{
