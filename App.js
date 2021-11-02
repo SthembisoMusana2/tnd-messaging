@@ -15,6 +15,7 @@ class User{
         this.cachedUsersList = []; // a short list of recent friends you've been talking to
         this.recentMessages = []; // recent messages sent to you by others
         this.friendsList = [] // list of friends you have on your account
+        this.friendHistory = {length:this.friendsList.length};
         this.groupMessageList = [];
     }
 
@@ -30,13 +31,31 @@ class User{
     }
     updateMessageList(message){
         if(message.sEmail != this.email)this.recentMessages.push(message);
-        this.historyList.push(message); // doesnt matter who the message is coming from just add it.
-        for (let friend of this.friendsList){
-            if(message.recipient === friend.email || message.sEmail === friend.email){
-                friend.historyList.push(message);
-                break;
+        // this.historyList.push(message); // doesnt matter who the message is coming from just add it.
+        if(message.sEmail != this.email){ // we are the recipient of the message
+            if(message.sEmail in this.friendHistory){
+                this.friendHistory[message.sEmail].push(message);
+            }
+            else{
+                this.friendHistory[message.sEmail] = [];
+                this.friendHistory[message.sEmail].push(message);
+            }
+        }else{ // if we are the sender, the friend becomes the recipient
+            if(message.recipient in this.friendHistory){
+                this.friendHistory[message.recipient].push(message);
+            }
+            else{
+                this.friendHistory[message.recipient] = [];
+                this.friendHistory[message.recipient].push(message);
             }
         }
+        
+        // for (let friend of this.friendsList){ // tie the message to the friend
+        //     if(message.recipient === friend.email || message.sEmail === friend.email){
+        //         friend.historyList.push(message);
+        //         break;
+        //     }
+        // }
     }
     clearRecentList(){
         this.recentMessages.splice(0, this.recentMessages.length);
@@ -88,7 +107,7 @@ class User{
             id:this.id,
             avatar:this.imgUrl,
             userId:this.id,
-            messages:this.recentListJSON(),
+            messages:this.friendHistory,
             friends:this.friendListToJSON()
         });
     }
@@ -100,7 +119,7 @@ class User{
             id:this.id,
             avatar:this.imgUrl,
             userId:this.id,
-            messages:this.historyList
+            // messages:this.historyList
         });
     }
 }
@@ -228,7 +247,7 @@ app.post('/send', (req, res)=>{
     let messageRef = JSON.parse(req.body);
     res.setHeader('Access-Control-Allow-Origin', '*');
     // route message from one user to the next
-    console.log(messageRef);
+    // console.log(messageRef);
     if(messageRef.recipientType === 'single'){
         let recipient  = messageRef.recipient;
         let user = searchArray(users, recipient, 'email');
@@ -422,12 +441,20 @@ app.post('/login', (req, resp)=>{
             if(userSearch == null){
                 await UserModel.findOne({email:userFormData.email})
                 .then((dbRes)=>{
-                    let id = dbRes._id.toString();
-                    let tempUser = new User(dbRes.username, dbRes.email, id, dbRes.avatar, dbRes.messages);
-                    tempUser.cachedUsersList.push(dbRes.friends);
-                    tempUser.friendsJSONToUserObjects();
-                    users.push(tempUser);
-                    resp.end(JSON.stringify(tempUser.toJSON())); 
+                    if(dbRes != null){
+                        let id = dbRes._id.toString();
+                        let tempUser = new User(dbRes.username, dbRes.email, id, dbRes.avatar, dbRes.messages);
+                        tempUser.cachedUsersList.push(dbRes.friends);
+                        tempUser.friendsJSONToUserObjects();
+                        users.push(tempUser);
+                        resp.end(JSON.stringify(tempUser.toJSON())); 
+                        console.log(tempUser.toJSON())
+                    }else{
+                        resp.write('failed$');
+                        res.status = res.status.split(':')[1];
+                        resp.end(JSON.stringify(res));
+                        
+                    }
                 })
                 .catch(err=>{console.log(err)})
             }else{
