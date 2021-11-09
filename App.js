@@ -3,6 +3,9 @@ const {signIn, createUser, usersList} = require('./signupLogin');
 
 const mongoose = require('mongoose');
 const UserModel = require('./UserSchema');
+// const expressWs = require('express-ws');
+let app = express();
+const expressWS = require('express-ws')(app);
 
 class User{
     constructor(username, email, id, imgR, historyList = []){
@@ -17,6 +20,17 @@ class User{
         this.friendsList = [] // list of friends you have on your account
         this.friendHistory = {length:this.friendsList.length};
         this.groupMessageList = [];
+        this.socketChannel = null;
+    }
+
+    setSocketChannel(socket){
+        this.socketChannel = socket;
+    }
+
+    sendM(msg){
+        console.log('Message sent to-->', this.username);
+        this.socketChannel.send(msg);
+        
     }
 
     appendFriendList(user){
@@ -205,8 +219,8 @@ function toRegExp(str=''){
 }
 
 // setting up the server
-let app = express();
-const PORT = process.env.PORT;
+
+const PORT = process.env.PORT!=null?process.env.PORT : 9090;
 const users = [];
 
 const url = "mongodb+srv://Sthembiso:Stheshboi2C@cluster0.2hrhj.mongodb.net/TND?retryWrites=true&w=majority";
@@ -243,100 +257,192 @@ app.post('/users', (req, res)=>{ // request for your friend list
     else res.end(JSON.stringify({length:0}))
 });
 
-app.post('/send', (req, res)=>{
-    let messageRef = JSON.parse(req.body);
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    // route message from one user to the next
-    // console.log(messageRef);
-    if(messageRef.recipientType === 'single'){
-        let recipient  = messageRef.recipient;
-        let user = searchArray(users, recipient, 'email');
-        if( user != null){
-            let sender = searchArray(user.friendsList, messageRef.sEmail, 'email');
-            if(sender == null){ // we are not friends with the person we are contacting
-                let sender = searchArray(users, messageRef.sEmail, 'email');
-                user.appendFriendList(sender); // make us friends
-                sender.updateMessageList(messageRef); // update the senders message list for backup
-            }
-            else{
-                sender.updateMessageList(messageRef);
-            }
-            user.updateMessageList(messageRef);
-            
-            UserModel.findOneAndReplace(user.id, user.toJSON()) // update the User in the DB
-            .then(res=>{console.log('Backup Response: ',res)})
-            .catch(err=>{console.log(err);});
-
-            UserModel.findOneAndReplace(sender.id, sender.toJSON())
-            .then(res=>{})
-            .catch(err=>{console.log(err);});
-            // return;
-            messageRef.status = 'sent'
-            res.end(JSON.stringify(messageRef));
-
+app.ws('/send', (ws, req)=>{
+    
+    ws.on('message', (msg)=>{
+        
+        if(ws.email == null){ // user still not authenticated. Handshake
+            // console.log(msg);
+            let userInfo = JSON.parse(msg);
+            let senderO = searchArray(users, userInfo.sEmail, 'email');
+            if(senderO != null){
+                ws.email = userInfo.sEmail;
+                senderO.setSocketChannel(ws); // add the stream to the user
+                // senderO.sendM(JSON.stringify(msg))''
+            }else{
+                ws.send('Not signed in, please log in');
+            }  
         }else{
-            UserModel.findOne({email:recipient})
-            .then((dbRes)=>{
-                console.log('Database Reponse',dbRes);
-                if(dbRes != null){
-                    let id = dbRes._id.toString();
-                    let tempUser = new User(dbRes.username, dbRes.email, id, dbRes.avatar, dbRes.messages, []);
-                    tempUser.cachedUsersList.push(dbRes.friends);
-                    users.push(tempUser);
-                    tempUser.updateMessageList(messageRef);
-                    let sender = searchArray(tempUser.friendsList, messageRef.sEmail, 'email');
-                    if(sender == null){
-                        sender = searchArray(users, messageRef.sEmail, 'email');
-                        tempUser.appendFriendList(sender);
-                        sender.updateMessageList(messageRef);
+            // console.log(msg);
+            //find the recipient and the sender
+            let messageRef = JSON.parse(msg);
+            // res.setHeader('Access-Control-Allow-Origin', '*');
+            // route message from one user to the next
+            console.log(messageRef)
+            if(messageRef.recipientType === 'single'){
+                let recipient  = messageRef.recipient;
+                let user = searchArray(users, recipient, 'email');
+                if( user != null){
+                    let sender = searchArray(user.friendsList, messageRef.sEmail, 'email');
+                    if(sender == null){ // we are not friends with the person we are contacting
+                        let sender = searchArray(users, messageRef.sEmail, 'email');
+                        user.appendFriendList(sender); // make us friends
+                        sender.appendFriendList(user); // make them friends
+                        sender.updateMessageList(messageRef); // update the senders message list for backup
                     }
                     else{
                         sender.updateMessageList(messageRef);
                     }
-
-                    UserModel.findOneAndReplace(tempUser.id, tempUser.toJSON()) // update the User in the DB
+                    user.updateMessageList(messageRef);
+                    user.sendM(JSON.stringify(messageRef)); // it to the friend through their channel.
+                    
+                    // Back shit up into the database. ....
+                    UserModel.findOneAndReplace(user.id, user.toJSON()) // update the User in the DB
                     .then(res=>{console.log('Backup Response: ',res)})
                     .catch(err=>{console.log(err);});
-
+        
                     UserModel.findOneAndReplace(sender.id, sender.toJSON())
                     .then(res=>{})
                     .catch(err=>{console.log(err);});
 
                     messageRef.status = 'sent'
-                    res.end(JSON.stringify(messageRef));
-                } 
-            })
-            .catch(err=>{console.log(err)})
-        }        
-    }
-    else if(messageRef.recipientType === 'group'){
-        let groupName = messageRef.group.name;
-        let group = searchArray(groups, groupName);
-        // route message to every user in the group ... 
-        group.updateMessageList(messageRef);
-        messageRef.status = 'sent';
-        res.end(JSON.stringify(messageRef));
-        // return;
-    }    
+                    ws.send(JSON.stringify(messageRef));
+        
+                }else{
+                    UserModel.findOne({email:recipient})
+                    .then((dbRes)=>{
+                        console.log('Database Reponse',dbRes);
+                        if(dbRes != null){
+                            let id = dbRes._id.toString();
+                            let tempUser = new User(dbRes.username, dbRes.email, id, dbRes.avatar, dbRes.messages, []);
+                            tempUser.cachedUsersList.push(dbRes.friends);
+                            users.push(tempUser);
+                            tempUser.updateMessageList(messageRef);
+                            let sender = searchArray(tempUser.friendsList, messageRef.sEmail, 'email');
+                            if(sender == null){
+                                sender = searchArray(users, messageRef.sEmail, 'email');
+                                tempUser.appendFriendList(sender);
+                                sender.appendFriendList(tempUser);
+                                sender.updateMessageList(messageRef);
+                            }
+                            else{
+                                sender.updateMessageList(messageRef);
+                            }
+        
+                            // Update the database of the new changes....
+                            UserModel.findOneAndReplace(tempUser.id, tempUser.toJSON()) // update the User in the DB
+                            .then(res=>{console.log('Backup Response: ',res)})
+                            .catch(err=>{console.log(err);});
+        
+                            UserModel.findOneAndReplace(sender.id, sender.toJSON())
+                            .then(res=>{})
+                            .catch(err=>{console.log(err);});
+        
+                            messageRef.status = 'sent'
+                            res.end(JSON.stringify(messageRef));
+                        } 
+                    })
+                    .catch(err=>{console.log(err)})
+                }        
+            }
+        }
+    })
 });
 
-app.post('/poll', (req, res)=>{
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    let userRef = JSON.parse(req.body);
-    let user = searchArray(users, userRef.username);
-    if(user != null){
-        if(!user.isRecentEmpty()){
-            res.end(JSON.stringify(user.recentListJSON()));
-            user.clearRecentList();
-            return;
-        }
-        else{
-            res.end(JSON.stringify({length:0}));
-            return;
-        }
-    }
-    res.end(JSON.stringify({status:'User not found!'}));
-});
+// app.post('/send', (req, res)=>{
+//     let messageRef = JSON.parse(req.body);
+//     res.setHeader('Access-Control-Allow-Origin', '*');
+//     // route message from one user to the next
+//     // console.log(messageRef);
+//     if(messageRef.recipientType === 'single'){
+//         let recipient  = messageRef.recipient;
+//         let user = searchArray(users, recipient, 'email');
+//         if( user != null){
+//             let sender = searchArray(user.friendsList, messageRef.sEmail, 'email');
+//             if(sender == null){ // we are not friends with the person we are contacting
+//                 let sender = searchArray(users, messageRef.sEmail, 'email');
+//                 user.appendFriendList(sender); // make us friends
+//                 sender.updateMessageList(messageRef); // update the senders message list for backup
+//             }
+//             else{
+//                 sender.updateMessageList(messageRef);
+//             }
+//             user.updateMessageList(messageRef);
+            
+//             UserModel.findOneAndReplace(user.id, user.toJSON()) // update the User in the DB
+//             .then(res=>{console.log('Backup Response: ',res)})
+//             .catch(err=>{console.log(err);});
+
+//             UserModel.findOneAndReplace(sender.id, sender.toJSON())
+//             .then(res=>{})
+//             .catch(err=>{console.log(err);});
+//             // return;
+//             messageRef.status = 'sent'
+//             res.end(JSON.stringify(messageRef));
+
+//         }else{
+//             UserModel.findOne({email:recipient})
+//             .then((dbRes)=>{
+//                 console.log('Database Reponse',dbRes);
+//                 if(dbRes != null){
+//                     let id = dbRes._id.toString();
+//                     let tempUser = new User(dbRes.username, dbRes.email, id, dbRes.avatar, dbRes.messages, []);
+//                     tempUser.cachedUsersList.push(dbRes.friends);
+//                     users.push(tempUser);
+//                     tempUser.updateMessageList(messageRef);
+//                     let sender = searchArray(tempUser.friendsList, messageRef.sEmail, 'email');
+//                     if(sender == null){
+//                         sender = searchArray(users, messageRef.sEmail, 'email');
+//                         tempUser.appendFriendList(sender);
+//                         sender.updateMessageList(messageRef);
+//                     }
+//                     else{
+//                         sender.updateMessageList(messageRef);
+//                     }
+
+//                     UserModel.findOneAndReplace(tempUser.id, tempUser.toJSON()) // update the User in the DB
+//                     .then(res=>{console.log('Backup Response: ',res)})
+//                     .catch(err=>{console.log(err);});
+
+//                     UserModel.findOneAndReplace(sender.id, sender.toJSON())
+//                     .then(res=>{})
+//                     .catch(err=>{console.log(err);});
+
+//                     messageRef.status = 'sent'
+//                     res.end(JSON.stringify(messageRef));
+//                 } 
+//             })
+//             .catch(err=>{console.log(err)})
+//         }        
+//     }
+//     else if(messageRef.recipientType === 'group'){
+//         let groupName = messageRef.group.name;
+//         let group = searchArray(groups, groupName);
+//         // route message to every user in the group ... 
+//         group.updateMessageList(messageRef);
+//         messageRef.status = 'sent';
+//         res.end(JSON.stringify(messageRef));
+//         // return;
+//     }    
+// });
+
+// app.post('/poll', (req, res)=>{
+//     res.setHeader('Access-Control-Allow-Origin', '*');
+//     let userRef = JSON.parse(req.body);
+//     let user = searchArray(users, userRef.username);
+//     if(user != null){
+//         if(!user.isRecentEmpty()){
+//             res.end(JSON.stringify(user.recentListJSON()));
+//             user.clearRecentList();
+//             return;
+//         }
+//         else{
+//             res.end(JSON.stringify({length:0}));
+//             return;
+//         }
+//     }
+//     res.end(JSON.stringify({status:'User not found!'}));
+// });
 
 app.post('/addFriend', (req, res)=>{
     let user = JSON.parse(req.body);
@@ -447,8 +553,9 @@ app.post('/login', (req, resp)=>{
                         tempUser.cachedUsersList.push(dbRes.friends);
                         tempUser.friendsJSONToUserObjects();
                         users.push(tempUser);
-                        resp.end(JSON.stringify(tempUser.toJSON())); 
-                        console.log(tempUser.toJSON())
+                        resp.end(JSON.stringify(tempUser.toJSON()));
+                         
+                        // console.log(tempUser.toJSON())
                     }else{
                         resp.write('failed$');
                         res.status = res.status.split(':')[1];
