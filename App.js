@@ -262,7 +262,7 @@ app.ws('/send', (ws, req)=>{
     ws.on('message', (msg)=>{
         
         if(ws.email == null){ // user still not authenticated. Handshake
-            // console.log(msg);
+            console.log(msg);
             let userInfo = JSON.parse(msg);
             let senderO = searchArray(users, userInfo.email, 'email');
             if(senderO != null){
