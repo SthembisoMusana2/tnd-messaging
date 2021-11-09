@@ -8,7 +8,7 @@ let app = express();
 const expressWS = require('express-ws')(app);
 
 class User{
-    constructor(username, email, id, imgR, historyList = []){
+    constructor(username, email, id, imgR, messages){
         this.username = username;
         this.id = id;
         this.email = email;
@@ -18,7 +18,7 @@ class User{
         this.cachedUsersList = []; // a short list of recent friends you've been talking to
         this.recentMessages = []; // recent messages sent to you by others
         this.friendsList = [] // list of friends you have on your account
-        this.friendHistory = {length:this.friendsList.length};
+        this.friendHistory = messages;
         this.groupMessageList = [];
         this.socketChannel = null;
     }
@@ -64,12 +64,6 @@ class User{
             }
         }
         
-        // for (let friend of this.friendsList){ // tie the message to the friend
-        //     if(message.recipient === friend.email || message.sEmail === friend.email){
-        //         friend.historyList.push(message);
-        //         break;
-        //     }
-        // }
     }
     clearRecentList(){
         this.recentMessages.splice(0, this.recentMessages.length);
@@ -135,25 +129,6 @@ class User{
             userId:this.id,
             // messages:this.historyList
         });
-    }
-}
-
-class Group{
-    constructor(name, participants = []){
-        this.name = name;
-        this.participants = participants; // list of participants
-        this.id = null;
-        this.messageHistory = [];
-    }
-
-    setMessageHistory(historyList){
-        this.messageHistory= historyList;
-    }
-    appendMessage(message){
-        this.messageHistory.push(message);
-        for(let i = 0; i<this.participants.length; i++){
-            this.participants[i].updateMessageList(message);
-        }
     }
 }
 
