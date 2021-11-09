@@ -264,21 +264,18 @@ app.ws('/send', (ws, req)=>{
         if(ws.email == null){ // user still not authenticated. Handshake
             // console.log(msg);
             let userInfo = JSON.parse(msg);
-            let senderO = searchArray(users, userInfo.sEmail, 'email');
+            let senderO = searchArray(users, userInfo.email, 'email');
             if(senderO != null){
-                ws.email = userInfo.sEmail;
+                ws.email = userInfo.email;
                 senderO.setSocketChannel(ws); // add the stream to the user
                 // senderO.sendM(JSON.stringify(msg))''
             }else{
                 ws.send('Not signed in, please log in');
             }  
         }else{
-            // console.log(msg);
+            // consclearole.log(msg);
             //find the recipient and the sender
             let messageRef = JSON.parse(msg);
-            // res.setHeader('Access-Control-Allow-Origin', '*');
-            // route message from one user to the next
-            console.log(messageRef)
             if(messageRef.recipientType === 'single'){
                 let recipient  = messageRef.recipient;
                 let user = searchArray(users, recipient, 'email');
