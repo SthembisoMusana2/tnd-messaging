@@ -298,7 +298,7 @@ app.ws('/send', (ws, req)=>{
                     .then(res=>{console.log('Backup Response: ',res)})
                     .catch(err=>{console.log(err);});
         
-                    if(send != null)UserModel.findOneAndReplace(sender.id, sender.toJSON())
+                    if(sender != null)UserModel.findOneAndReplace(sender.id, sender.toJSON())
                     .then(res=>{})
                     .catch(err=>{console.log(err);});
 
