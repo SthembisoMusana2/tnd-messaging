@@ -290,6 +290,7 @@ app.ws('/send', (ws, req)=>{
                     else{
                         sender.updateMessageList(messageRef);
                     }
+                    console.log(users)
                     user.updateMessageList(messageRef);
                     user.sendM(JSON.stringify(messageRef)); // it to the friend through their channel.
                     
