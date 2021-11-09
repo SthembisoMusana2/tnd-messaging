@@ -290,16 +290,15 @@ app.ws('/send', (ws, req)=>{
                     else{
                         sender.updateMessageList(messageRef);
                     }
-                    console.log(users)
                     user.updateMessageList(messageRef);
-                    user.sendM(JSON.stringify(messageRef)); // it to the friend through their channel.
+                    if(user.socketChannel != null) user.sendM(JSON.stringify(messageRef)); // it to the friend through their channel.
                     
                     // Back shit up into the database. ....
                     UserModel.findOneAndReplace(user.id, user.toJSON()) // update the User in the DB
                     .then(res=>{console.log('Backup Response: ',res)})
                     .catch(err=>{console.log(err);});
         
-                    UserModel.findOneAndReplace(sender.id, sender.toJSON())
+                    if(send != null)UserModel.findOneAndReplace(sender.id, sender.toJSON())
                     .then(res=>{})
                     .catch(err=>{console.log(err);});
 
@@ -332,7 +331,7 @@ app.ws('/send', (ws, req)=>{
                             .then(res=>{console.log('Backup Response: ',res)})
                             .catch(err=>{console.log(err);});
         
-                            UserModel.findOneAndReplace(sender.id, sender.toJSON())
+                            if(sender != null)UserModel.findOneAndReplace(sender.id, sender.toJSON())
                             .then(res=>{})
                             .catch(err=>{console.log(err);});
         
@@ -446,7 +445,7 @@ app.post('/login', (req, resp)=>{
         resp.setHeader('Access-Control-Allow-Origin', '*');
         if(res.status == ''){ // the login was successful
             resp.write('successful$');
-            let userSearch = searchArray(users, res.email, 'email');
+            let userSearch = searchArray(users, res.email, 'email'); // search if the user doesn't already exist
             if(userSearch == null){
                 await UserModel.findOne({email:userFormData.email})
                 .then((dbRes)=>{
